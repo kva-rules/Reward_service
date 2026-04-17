@@ -1,0 +1,56 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: reward-service-test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: reward-service-test-group
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+app:
+  jwt:
+    secret: testSecretKeyForJWTTokenValidationThatIsAtLeast256BitsLongForTesting
+  
+  reward:
+    rules:
+      ticket-resolved: 50
+      solution-approved: 30
+      knowledge-created: 20
+      upvote-received: 5
+
+  kafka:
+    topics:
+      ticket-resolved: test.ticket.resolved
+      solution-approved: test.solution.approved
+      knowledge-created: test.knowledge.created
+      solution-voted: test.solution.voted
+      knowledge-rated: test.knowledge.rated
+      reward-points-added: test.reward.points.added
+      reward-badge-awarded: test.reward.badge.awarded
+      leaderboard-updated: test.leaderboard.updated
+
+logging:
+  level:
+    root: WARN
+    com.cognizant.Reward_service: DEBUG

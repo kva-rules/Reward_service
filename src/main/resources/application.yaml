@@ -1,3 +1,65 @@
+server:
+  port: 8085
+
 spring:
   application:
-    name: Reward_Service
+    name: reward-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reward_service_db
+    username: postgres
+    password: root
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: reward-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:mySecretKeyForJWTTokenValidationThatIsAtLeast256BitsLong}
+  
+  reward:
+    rules:
+      ticket-resolved: 50
+      solution-approved: 30
+      knowledge-created: 20
+      upvote-received: 5
+
+  kafka:
+    topics:
+      ticket-resolved: ticket.resolved
+      solution-approved: solution.approved
+      knowledge-created: knowledge.created
+      solution-voted: solution.voted
+      knowledge-rated: knowledge.rated
+      reward-points-added: reward.points.added
+      reward-badge-awarded: reward.badge.awarded
+      leaderboard-updated: leaderboard.updated
+
+logging:
+  level:
+    root: INFO
+    com.cognizant.Reward_service: DEBUG
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
