@@ -94,13 +94,17 @@ public class RewardServiceImpl implements RewardService {
     @Override
     public RewardResponseDTO getUserPoints(UUID userId) {
         log.debug("Fetching points for user: {}", userId);
-        
-        RewardPoints rewardPoints = rewardPointsRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // A user with no reward activity is a normal state, not a 404 — the gateway and
+        // frontend hit this endpoint for every authenticated user (including freshly-registered
+        // ones who have never earned points). Return a zero-balance response instead of throwing.
+        int totalPoints = rewardPointsRepository.findByUserId(userId)
+                .map(RewardPoints::getTotalPoints)
+                .orElse(0);
 
         return RewardResponseDTO.builder()
                 .userId(userId)
-                .totalPoints(rewardPoints.getTotalPoints())
+                .totalPoints(totalPoints)
                 .build();
     }
 

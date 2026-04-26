@@ -1,176 +1,146 @@
 # Reward Service
 
-A Spring Boot microservice for managing gamification, rewards, badges, and leaderboards.
+Gamification microservice — points, badges, and leaderboards. Consumes domain events from `ticket-service`, `solution-service`, and `knowledge-service`, and awards points per **configurable rules** (see `app.reward.rules` in yaml). Exposes REST for the frontend leaderboard / user-statistics / badge catalog.
 
-## Features
+---
 
-- **Points Calculation Engine** - Configurable rule-based point system
-- **Gamification System** - Event-driven rewards for user activities
-- **Badge Achievements** - Automatic and manual badge assignment
-- **Leaderboard Ranking** - Daily, weekly, monthly, and all-time rankings
-- **Contribution Tracking** - Track user contributions across the platform
-- **Event-Driven Architecture** - Kafka integration for async processing
-- **Analytics & Statistics** - Comprehensive reward statistics API
+## At a glance
+| | |
+|---|---|
+| **Port** | 8086 |
+| **Database** | postgres-reward (`reward_db`) |
+| **Kafka topics (in)** | `ticket.resolved`, `solution.approved`, `solution.voted`, `knowledge.created`, `knowledge.rated` |
+| **Kafka topics (out)** | `reward.points.added`, `reward.badge.awarded`, `leaderboard.updated` |
+| **Swagger UI (direct)** | http://localhost:8086/swagger-ui.html |
+| **Swagger UI (via gateway)** | http://localhost:8080/swagger-ui.html?urls.primaryName=reward-service |
+| **OpenAPI JSON** | http://localhost:8086/v3/api-docs |
+| **Java** | 21 (Temurin) |
+| **Spring Boot** | 3.2.4 |
 
-## Tech Stack
+---
 
-- Java 17
-- Spring Boot 3.2.4
-- Spring Data JPA
-- Spring Security (JWT)
-- Spring Kafka
-- PostgreSQL
-- MapStruct
-- Lombok
-- JaCoCo (80% coverage requirement)
+## What it does
+- Listens for lifecycle events from 3 upstream services
+- **Awards points** per configurable rule
+- **Unlocks badges** when cumulative point thresholds cross
+- **Computes leaderboard** (global + per-period) and republishes it on every change
+- Exposes read APIs for the frontend dashboard
 
-## Getting Started
+---
 
-### Prerequisites
-
-- Java 17+
-- Maven 3.8+
-- PostgreSQL 14+
-- Apache Kafka
-
-### Configuration
-
-Update `application.yaml` with your environment settings:
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/reward_service_db
-    username: postgres
-    password: root
-
-  kafka:
-    bootstrap-servers: localhost:9092
-
-app:
-  jwt:
-    secret: ${JWT_SECRET}
-```
-
-### Running Locally
-
-```bash
-# Build the project
-./mvnw clean install
-
-# Run the application
-./mvnw spring-boot:run
-```
-
-### Running with Docker
-
-```bash
-# Build Docker image
-docker build -t reward-service:latest .
-
-# Run container
-docker run -p 8085:8085 reward-service:latest
-```
-
-## API Endpoints
-
-### Reward APIs
-
-| Method | Endpoint | Description | Role |
-|--------|----------|-------------|------|
-| GET | `/api/rewards/users/{userId}/points` | Get user points | ENGINEER |
-| GET | `/api/rewards/users/{userId}/transactions` | Get user transactions | ENGINEER |
-| POST | `/api/rewards/points` | Add points | ADMIN |
-| GET | `/api/rewards/users/{userId}/contributions` | Get contribution summary | ENGINEER |
-
-### Badge APIs
-
-| Method | Endpoint | Description | Role |
-|--------|----------|-------------|------|
-| GET | `/api/rewards/users/{userId}/badges` | Get user badges | ENGINEER |
-| GET | `/api/rewards/badges` | Get all badges | ENGINEER |
-| POST | `/api/rewards/badges` | Create badge | ADMIN |
-| POST | `/api/rewards/badges/assign` | Assign badge | ADMIN |
-
-### Leaderboard APIs
-
-| Method | Endpoint | Description | Role |
-|--------|----------|-------------|------|
-| GET | `/api/rewards/leaderboard` | Get leaderboard | ENGINEER |
-| GET | `/api/rewards/top-contributors` | Get top contributors | ENGINEER |
-| POST | `/api/rewards/leaderboard/generate` | Generate leaderboard | ADMIN |
-
-### Statistics API
-
-| Method | Endpoint | Description | Role |
-|--------|----------|-------------|------|
-| GET | `/api/rewards/statistics` | Get reward statistics | ENGINEER |
-
-### Internal APIs
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/internal/rewards/event` | Process reward event |
-| GET | `/internal/rewards/users/{userId}` | Get user reward info |
-
-## Kafka Topics
-
-### Consumed Topics
-- `ticket.resolved` - Ticket resolved events
-- `solution.approved` - Solution approved events
-- `knowledge.created` - Knowledge article created events
-- `solution.voted` - Solution upvote events
-- `knowledge.rated` - Knowledge article rated events
-
-### Published Topics
-- `reward.points.added` - Points added notification
-- `reward.badge.awarded` - Badge awarded notification
-- `leaderboard.updated` - Leaderboard updated notification
-
-## Point Rules (Configurable)
-
+## Reward rules (`app.reward.rules` in `application.yaml`)
 | Event | Points |
-|-------|--------|
-| Ticket Resolved | 50 |
-| Solution Approved | 30 |
-| Knowledge Created | 20 |
-| Upvote Received | 5 |
+|---|---|
+| `ticket-resolved` | 50 |
+| `solution-approved` | 30 |
+| `knowledge-created` | 20 |
+| `upvote-received` | 5 |
 
-## Testing
-
+Change these without a redeploy by setting env vars:
 ```bash
-# Run tests
-./mvnw test
-
-# Run tests with coverage report
-./mvnw test jacoco:report
-
-# View coverage report
-open target/site/jacoco/index.html
+APP_REWARD_RULES_TICKET_RESOLVED=100 ./services.sh restart reward-service
 ```
 
-## Project Structure
+---
 
+## Kafka topic mapping (`app.kafka.topics` in yaml)
+| Logical event | Topic |
+|---|---|
+| Ticket resolved | `ticket.resolved` |
+| Solution approved | `solution.approved` |
+| Knowledge created | `knowledge.created` |
+| Solution voted | `solution.voted` |
+| Knowledge rated | `knowledge.rated` |
+| Reward points added (out) | `reward.points.added` |
+| Reward badge awarded (out) | `reward.badge.awarded` |
+| Leaderboard updated (out) | `leaderboard.updated` |
+
+---
+
+## API surface
+
+### Rewards (`/api/rewards/**`)
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/rewards` | JWT | Current user's point history |
+| GET | `/api/rewards/by-user/{userId}` | JWT | Admin / manager lookup |
+| POST | `/api/rewards` | JWT + ADMIN | Manual point grant |
+| GET | `/api/rewards/{id}` | JWT | Single reward record |
+
+### Badges (`/api/badges/**`)
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/badges` | JWT | Badge catalog |
+| GET | `/api/badges/by-user/{userId}` | JWT | Badges unlocked by a user |
+| POST | `/api/badges` | JWT + ADMIN | Create badge definition |
+| PUT | `/api/badges/{id}` | JWT + ADMIN | Edit badge |
+
+### Leaderboard (`/api/leaderboard/**`)
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/leaderboard` | JWT | Global top-N |
+| GET | `/api/leaderboard/by-period?days=30` | JWT | Rolling-window leaderboard |
+| GET | `/api/leaderboard/rank/{userId}` | JWT | A single user's rank |
+
+### Statistics (`/api/statistics/**`)
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/statistics` | JWT | Aggregate counts for dashboards |
+
+### Internal (`/internal/**`) — service-to-service
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/internal/rewards` | Grant points (used if not event-driven) |
+| POST | `/internal/rewards/recalculate/{userId}` | Recompute a user's total |
+
+Live: **http://localhost:8086/swagger-ui.html**.
+
+---
+
+## Configuration
+| Env var | Yaml key | Default | Purpose |
+|---|---|---|---|
+| `SERVER_PORT` | `server.port` | `8086` | |
+| `SPRING_DATASOURCE_URL` | | `jdbc:postgresql://postgres-reward:5432/reward_db` | |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | | `kafka:9092` | |
+| `JWT_SECRET` | `jwt.secret` | (shared) | |
+| `APP_REWARD_RULES_*` | `app.reward.rules.*` | see above | Overridable scoring |
+
+---
+
+## Build & run
+```bash
+./services.sh start reward-service
 ```
-src/main/java/com/cognizant/Reward_service/
-├── config/           # Configuration classes
-├── controller/       # REST controllers
-├── domain/           # JPA entities
-├── dto/
-│   ├── event/        # Kafka event DTOs
-│   ├── request/      # Request DTOs
-│   └── response/     # Response DTOs
-├── enums/            # Enumerations
-├── exception/        # Custom exceptions & handlers
-├── kafka/            # Kafka producers & consumers
-├── mapper/           # MapStruct mappers
-├── repository/       # JPA repositories
-├── scheduler/        # Scheduled jobs
-├── security/         # JWT security
-└── service/
-    └── impl/         # Service implementations
-```
 
-## License
+## Docker / K8s
+- Manifest: `k8s/reward-service.yaml`
+- Service: `reward-service`
 
-This project is proprietary software.
+---
+
+## Troubleshooting
+
+**No points awarded after `ticket.resolved`**
+1. Confirm Kafka is up: `docker ps | grep kafka`.
+2. Tail reward logs: `./services.sh logs reward-service`. Look for `"Consumed event"` lines.
+3. If you see `UnknownTopicOrPartitionException`, restart Kafka or restart the producing service to auto-create the topic.
+4. Verify consumer-group offset with `docker exec kafka kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group reward-service-group`.
+
+**Leaderboard stale**
+Aggregation runs synchronously on each reward event. Check `leaderboard.updated` is being published (consumer-group lag should be 0).
+
+**Double-credit when retrying events**
+Reward-service is idempotent per `(userId, eventType, sourceId)`. Duplicate events are no-ops, but verify by inspecting `rewards.source_event_id` uniqueness.
+
+---
+
+## Tech stack
+- Java 21 (Temurin)
+- Spring Boot 3.2.4
+- Spring Kafka (consumer + producer)
+- Spring Data JPA + PostgreSQL 16
+- Spring Security + JJWT
+- springdoc-openapi 2.6.0
+- Lombok 1.18.34
+- `com.kva:common-library` 1.0.0

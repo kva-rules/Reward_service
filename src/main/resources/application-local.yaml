@@ -4,13 +4,11 @@ server:
 spring:
   application:
     name: reward-service
-
   datasource:
-    url: jdbc:postgresql://postgres-reward:5432/reward_db
+    url: jdbc:postgresql://localhost:5432/reward_db
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -19,18 +17,19 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: localhost:9092
     consumer:
       group-id: reward-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      # ErrorHandlingDeserializer prevents poison-pill records from entering an infinite
-      # retry loop. Default type lets the JsonDeserializer fall back when the producer
-      # didn't add type info headers (which is the case for our SolutionEvent producer).
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        # Wrap the JSON deserializer in ErrorHandlingDeserializer so a single bad payload
+        # (e.g. a foreign event shape published to a topic we listen on) does NOT enter an
+        # infinite retry loop that fills the disk with stack traces (we caught one of these
+        # blowing the log file to ~88 GB before truncation). The bad record is logged once
+        # and skipped; the listener stays healthy.
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
@@ -43,14 +42,14 @@ jwt:
   secret: myVerySecretKeyForJWTThatIsLongEnoughForHS512Signature
 
 app:
-  
+  jwt:
+    secret: myVerySecretKeyForJWTThatIsLongEnoughForHS512Signature
   reward:
     rules:
       ticket-resolved: 50
       solution-approved: 30
       knowledge-created: 20
       upvote-received: 5
-
   kafka:
     topics:
       ticket-resolved: ticket.resolved
@@ -67,16 +66,3 @@ logging:
     root: INFO
     com.cognizant.Reward_service: DEBUG
     org.springframework.kafka: INFO
-    org.hibernate.SQL: DEBUG
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
-    try-it-out-enabled: true
-    display-request-duration: true

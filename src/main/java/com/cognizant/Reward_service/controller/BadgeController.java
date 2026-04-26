@@ -6,6 +6,10 @@ import com.cognizant.Reward_service.dto.response.BadgeResponseDTO;
 import com.cognizant.Reward_service.dto.response.UserBadgeResponseDTO;
 import com.cognizant.Reward_service.service.BadgeService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,14 +26,21 @@ import java.util.UUID;
 @RequestMapping("/api/rewards")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Badge", description = "Badge management APIs")
+@Tag(name = "Badges", description = "Badge catalog + awarded-badges queries")
 public class BadgeController {
 
     private final BadgeService badgeService;
 
     @GetMapping("/users/{userId}/badges")
     @Operation(summary = "Get user badges", description = "Retrieve all badges earned by a user")
-    public ResponseEntity<List<UserBadgeResponseDTO>> getUserBadges(@PathVariable UUID userId) {
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Badges returned"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<List<UserBadgeResponseDTO>> getUserBadges(
+            @Parameter(description = "User UUID") @PathVariable UUID userId) {
         log.info("GET /api/rewards/users/{}/badges", userId);
         return ResponseEntity.ok(badgeService.getUserBadges(userId));
     }
@@ -37,6 +48,13 @@ public class BadgeController {
     @PostMapping("/badges/assign")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Assign badge", description = "Manually assign a badge to a user (Admin only)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Badge assigned"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UserBadgeResponseDTO> assignBadge(@Valid @RequestBody BadgeAssignRequestDTO request) {
         log.info("POST /api/rewards/badges/assign for user: {}", request.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(badgeService.assignBadge(request));
@@ -45,6 +63,13 @@ public class BadgeController {
     @PostMapping("/badges")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create badge", description = "Create a new badge (Admin only)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Badge created"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BadgeResponseDTO> createBadge(@Valid @RequestBody BadgeRequestDTO request) {
         log.info("POST /api/rewards/badges - Creating badge: {}", request.getBadgeName());
         return ResponseEntity.status(HttpStatus.CREATED).body(badgeService.createBadge(request));
@@ -52,6 +77,11 @@ public class BadgeController {
 
     @GetMapping("/badges")
     @Operation(summary = "Get all badges", description = "Retrieve all available badges")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Badges returned"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<BadgeResponseDTO>> getAllBadges() {
         log.info("GET /api/rewards/badges");
         return ResponseEntity.ok(badgeService.getAllBadges());

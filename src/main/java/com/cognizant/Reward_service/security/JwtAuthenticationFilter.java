@@ -35,8 +35,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String userId = jwtTokenProvider.getUserIdFromToken(jwt);
                 List<String> roles = jwtTokenProvider.getRolesFromToken(jwt);
 
+                // The auth-service issues roles ALREADY prefixed with "ROLE_" (e.g. "ROLE_ADMIN").
+                // Re-prefixing would produce "ROLE_ROLE_ADMIN", which never matches @PreAuthorize
+                // hasRole('ADMIN') (Spring expands that to "ROLE_ADMIN") — admin endpoints would
+                // silently 403 even with a perfectly valid admin token. Only add the prefix when
+                // it's missing so we accept both shapes.
                 List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                        .map(role -> {
+                            String upper = role.toUpperCase();
+                            return new SimpleGrantedAuthority(upper.startsWith("ROLE_") ? upper : "ROLE_" + upper);
+                        })
                         .collect(Collectors.toList());
 
                 UsernamePasswordAuthenticationToken authentication = 
