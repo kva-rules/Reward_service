@@ -2,6 +2,7 @@ package com.cognizant.Reward_service.kafka;
 
 import com.cognizant.Reward_service.dto.event.RewardEventDTO;
 import com.cognizant.Reward_service.service.RewardEventProcessor;
+import com.library.common.event.SolutionApprovedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -46,9 +48,14 @@ class RewardEventConsumerTest {
 
     @Test
     void consumeSolutionApproved_ShouldProcessEvent() {
+        SolutionApprovedEvent approvedEvent = SolutionApprovedEvent.builder()
+                .solutionId(UUID.randomUUID().toString())
+                .ticketId(UUID.randomUUID().toString())
+                .contributorIds(List.of(UUID.randomUUID().toString()))
+                .build();
         doNothing().when(eventProcessor).processEvent(any(RewardEventDTO.class));
 
-        consumer.consumeSolutionApproved(event);
+        consumer.consumeSolutionApproved(approvedEvent);
 
         verify(eventProcessor, times(1)).processEvent(any(RewardEventDTO.class));
     }

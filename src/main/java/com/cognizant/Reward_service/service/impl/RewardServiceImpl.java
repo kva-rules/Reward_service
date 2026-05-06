@@ -62,7 +62,7 @@ public class RewardServiceImpl implements RewardService {
         transaction.setUserId(request.getUserId());
         transaction.setPoints(request.getPoints());
         transaction.setReason(request.getReason());
-        transaction.setReferenceId(request.getReferenceId());
+        transaction.setReferenceId(request.getReferenceId() != null ? request.getReferenceId() : UUID.randomUUID());
         transaction.setReferenceType(mapReasonToReferenceType(request.getReason()));
         transactionRepository.save(transaction);
 

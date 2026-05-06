@@ -127,6 +127,17 @@ Live: **http://localhost:8086/swagger-ui.html**.
 3. If you see `UnknownTopicOrPartitionException`, restart Kafka or restart the producing service to auto-create the topic.
 4. Verify consumer-group offset with `docker exec kafka kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group reward-service-group`.
 
+**No points awarded after `solution.approved` (May 2026 fix)**
+Root cause 1: The global `spring.json.value.default.type: RewardEventDTO` (in `application-local.yaml`) forced ALL Kafka messages to deserialise as `RewardEventDTO`. Spring then tried to convert the instance to `SolutionApprovedEvent` (the common-library class used as the listener parameter) — this conversion always failed.
+
+Root cause 2: `SolutionEvent.timestamp` is a `LocalDateTime`, which Jackson serialises as a JSON array `[2026, 5, 3, 12, 0]`. Attempting to deserialise that array into `RewardEventDTO.timestamp` (type `Long`) threw a `JsonMappingException`.
+
+Fix applied:
+- `RewardEventDTO` now has `@JsonIgnoreProperties(ignoreUnknown = true)` and `@JsonIgnore` on `timestamp`.
+- A local `SolutionApprovalEvent` DTO was created (matching the `contributors: List<UUID>` field the solution service actually publishes).
+- `KafkaConfig` has a dedicated `solutionApprovedContainerFactory` bean with `USE_TYPE_INFO_HEADERS: false` and `VALUE_DEFAULT_TYPE: SolutionApprovalEvent.class.getName()`.
+- `consumeSolutionApproved` in `RewardEventConsumer` uses `containerFactory = "solutionApprovedContainerFactory"` and accepts a `SolutionApprovalEvent` parameter.
+
 **Leaderboard stale**
 Aggregation runs synchronously on each reward event. Check `leaderboard.updated` is being published (consumer-group lag should be 0).
 
