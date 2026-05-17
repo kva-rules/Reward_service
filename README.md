@@ -146,6 +146,23 @@ Reward-service is idempotent per `(userId, eventType, sourceId)`. Duplicate even
 
 ---
 
+## Kubernetes
+- Manifest: `k8s/reward-service.yaml` (part of `k8s/services.yaml`)
+- Namespace: `ticketing-system`
+- Service DNS (intra-cluster): `reward-service:8086`
+- Access via ingress: `http://ticketing.local/api/rewards/**`
+
+```bash
+# View logs (shows reward points events, leaderboard updates)
+./services.sh k8s-logs reward-service
+# or: kubectl logs -n ticketing-system deployment/reward-service -f
+
+# Restart the pod
+kubectl rollout restart deployment/reward-service -n ticketing-system
+```
+
+---
+
 ## Tech stack
 - Java 21 (Temurin)
 - Spring Boot 3.2.4
